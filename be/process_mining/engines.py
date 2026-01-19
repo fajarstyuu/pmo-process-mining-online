@@ -10,14 +10,15 @@ from pm4py.algo.conformance.tokenreplay import algorithm as token_replay
 
 from pm4py.algo.evaluation.replay_fitness.variants import token_replay as fitness_evaluator
 from pm4py.algo.evaluation.precision.variants import etconformance_token as precision_evaluator
-from pm4py.algo.evaluation.precision.variants import etconformance_token as generalization_evaluator
+from pm4py.algo.evaluation.generalization import algorithm as generalization_evaluator
 
 # from pm4py.algo.evaluation.replay_fitness import algorithm as fitness_evaluator
 # from pm4py.algo.evaluation.precision import algorithm as precision_evaluator
 # from pm4py.algo.evaluation.generalization import algorithm as generalization_evaluator
 from pm4py.algo.evaluation.simplicity import algorithm as simplicity_evaluator
 from pm4py.algo.discovery.dfg import algorithm as dfg_discovery
-
+from pm4py.statistics.variants.log import get as variants_module
+from pm4py import get_event_attribute_values
 import json
 
 class ProcessDiscoveryEngine(ABC):
@@ -741,3 +742,76 @@ def _compute_case_statistics(df: pd.DataFrame) -> List[Dict[str, Any]]:
         })
 
     return result
+
+def _compute_variant_statistics(df: pd.DataFrame) -> List[Dict[str, Any]]:
+    """
+    Compute variant statistics: frequency of each variant
+    """
+    """
+    Return a list of variant statistics. Each item contains:
+    {
+        "variant": [<activity1>, <activity2>, ...],
+        "count": int,
+        "percent": float (rounded to 2 decimals)
+    }
+
+    Notes:
+    - This function does NOT mutate the input DataFrame.
+    - If case ids or activity names are missing, an empty list is returned.
+    - Exceptions are not silently swallowed; errors will propagate to the caller.
+    """
+    if df is None or 'case:concept:name' not in df.columns or 'concept:name' not in df.columns:
+        return []
+    
+    variants: List[Dict[Any, Any]] = []
+    log_variant = variants_module.get_variants(df)
+    for variant, count in log_variant.items():
+        variant_string = " → ".join(variant)
+        variants.append({
+            "variant": variant_string,
+            "count": len(count),
+            "percent": round((len(count) / len(df['case:concept:name'].unique()) * 100), 2) if len(df['case:concept:name'].unique()) > 0 else 0.0
+        })
+
+    variants.sort(key=lambda x: x['count'], reverse=True)
+
+    return variants
+
+def _compute_resource_statistics(df: pd.DataFrame) -> List[Dict[str, Any]]:
+    """
+    Compute resource statistics: frequency of each resource
+    """
+    """
+    Return a list of resource statistics. Each item contains:
+    {
+        "resource": <resource name>,
+        "count": int,
+        "percent": float (rounded to 2 decimals)
+    }
+
+    Notes:
+    - This function does NOT mutate the input DataFrame.
+    - If resource column is missing, an empty list is returned.
+    - Exceptions are not silently swallowed; errors will propagate to the caller.
+    """
+    if df is None or 'org:resource' not in df.columns:
+        return []
+
+    try:
+        resources: List[Dict[str, Any]] = []
+        resource = get_event_attribute_values(df, "org:resource")
+        event_percentage = (df['org:resource'].value_counts() / len(df) * 100).round(2) if len(df) > 0 else df['org:resource'].value_counts() * 0.0
+
+        for res, count in resource.items():
+            percent = float(event_percentage[res]) if res in event_percentage.index else 0.0
+            resources.append({
+                "resource": res,
+                "count": count,
+                "percent": percent
+            })
+
+        return resources
+
+    except Exception:
+        raise
+

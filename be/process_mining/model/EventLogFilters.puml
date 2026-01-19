@@ -1,0 +1,49 @@
+@startuml EventLogFilters
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+
+class EventLog {
+}
+
+abstract class EventLogFilter <<dataclass>> {
+    +event_log: EventLog
+    +variant_coverage: float
+    +event_coverage: float
+    +start_time_performance: float
+    +end_time_performance: float
+    +max_size_performance: float
+    +min_size_performance: float
+    +filter_type: str
+    +apply(event_log, config)
+}
+
+class VariantCoverageFilter <<dataclass>> {
+    +apply(event_log, variant_coverage: float)
+}
+
+class EventCoverageFilter <<dataclass>> {
+    +apply(event_log, event_coverage: float)
+}
+
+class CaseDurationFilter <<dataclass>> {
+    +apply(event_log, min_performance: float, max_performance: float)
+}
+
+class CaseSizeFilter <<dataclass>> {
+    +apply(event_log, min_size: int, max_size: int)
+}
+
+VariantCoverageFilter --|> EventLogFilter
+EventCoverageFilter --|> EventLogFilter
+CaseDurationFilter --|> EventLogFilter
+CaseSizeFilter --|> EventLogFilter
+
+EventLogFilter --> EventLog : uses
+
+note right of EventLogFilter
+  Base abstract filter defining shared
+  configuration fields and the contract
+  for apply(event_log, config).
+end note
+
+@enduml
